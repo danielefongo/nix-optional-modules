@@ -22,7 +22,16 @@
           packages = [ nix-tests.packages.${system}.default ];
         };
 
-        lib = import ./lib/modules.nix { config = { }; };
+        lib = import ./lib/modules.nix {
+          inherit (pkgs) lib;
+          config = { };
+        };
+        mkLib =
+          {
+            lib,
+            config ? { },
+          }:
+          import ./lib/modules.nix { inherit lib config; };
       }
     );
 }

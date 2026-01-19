@@ -1,6 +1,17 @@
-{ ... }:
+{
+  lib,
+  config ? { },
+}:
 
 let
+
+  libConfig = {
+    prefix = "module";
+  }
+  // config;
+
+  prefixPath = lib.splitString "." libConfig.prefix;
+
   mkModule =
     {
       pathPrefix,
@@ -103,7 +114,7 @@ let
     name: opts: moduleFn:
     mkModule {
       inherit name opts moduleFn;
-      pathPrefix = [ "module" ];
+      pathPrefix = prefixPath;
     };
 
   mkOptionalBundle = path: modulePaths: {
@@ -116,8 +127,8 @@ let
             map (
               modulePath:
               let
-                bundlePath = [ "module" ] ++ lib.splitString "." path;
-                fullModulePath = [ "module" ] ++ lib.splitString "." modulePath;
+                bundlePath = prefixPath ++ lib.splitString "." path;
+                fullModulePath = prefixPath ++ lib.splitString "." modulePath;
                 bundleCfg = lib.attrByPath bundlePath { } config;
                 bundleEnabled = bundleCfg.enable or null;
               in

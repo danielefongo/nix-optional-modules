@@ -41,6 +41,30 @@ Add the library to your flake inputs and extend your lib:
 }
 ```
 
+#### Custom Configuration
+
+You can customize the library's behavior, such as changing the default prefix from `module` to something else:
+
+```nix
+# In your overlay
+(self: super: {
+  lib = super.lib // {
+    customOpts = inputs.nix-optional-modules.mkLib.${super.system} {
+      lib = super.lib;
+      config = {
+        prefix = "custom.prefix";
+      };
+    };
+  };
+})
+```
+
+With this configuration, instead of using `module.<path>`, you would use `custom.prefix.<path>`.
+
+Available configuration options:
+
+- `prefix` - The attribute path prefix for modules (default: `"module"`)
+
 ## Quick Start
 
 ### Module

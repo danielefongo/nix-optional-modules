@@ -5,7 +5,7 @@
 
 let
   lib = pkgs.lib;
-  opts = import ./modules.nix { inherit pkgs; };
+  opts = import ./modules.nix { inherit lib; };
   tests = nix-tests;
 
   simulateConfig =
@@ -363,6 +363,56 @@ in
         (t.isEq "parent is disabled" context.config.module.parent.enable false)
         (t.isEq "bundle is enabled" context.config.module.parent.bundle.enable true)
         (t.isEq "no output is set" context.config.output { })
+      ];
+    })
+
+    (tests.test "custom prefix" {
+      context =
+        let
+          optsCustom = import ./modules.nix {
+            inherit lib;
+            config = {
+              prefix = "prefix";
+            };
+          };
+        in
+
+        simulateConfig {
+          imports = [
+            (optsCustom.module "path.to.mod" {
+              value = { };
+            } (cfg: { }))
+          ];
+
+          prefix.path.to.mod.enable = true;
+        };
+      checks = t: context: [
+        (t.isTrue "module is enabled" context.config.prefix.path.to.mod.enable)
+      ];
+    })
+
+    (tests.test "multi-part prefix" {
+      context =
+        let
+          optsCustom = import ./modules.nix {
+            inherit lib;
+            config = {
+              prefix = "my.long.prefix";
+            };
+          };
+        in
+
+        simulateConfig {
+          imports = [
+            (optsCustom.module "path.to.mod" { } (cfg: {
+              output.result = true;
+            }))
+          ];
+
+          my.long.prefix.path.to.mod.enable = true;
+        };
+      checks = t: context: [
+        (t.isEq "module is enabled" context.config.my.long.prefix.path.to.mod.enable true)
       ];
     })
   ];
