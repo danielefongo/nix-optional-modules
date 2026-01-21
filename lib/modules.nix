@@ -4,7 +4,6 @@
 }:
 
 let
-
   libConfig = {
     prefix = "module";
   }
@@ -147,8 +146,16 @@ let
       )
     ];
   };
+
+  mkWithCustomConfig =
+    newConfig:
+    import ./modules.nix {
+      inherit lib;
+      config = libConfig // newConfig;
+    };
 in
 {
   bundle = mkOptionalBundle;
   module = mkOptionalModule;
+  withConfig = mkWithCustomConfig;
 }

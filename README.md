@@ -38,30 +38,6 @@ Add the library to your flake inputs and extend your lib:
 }
 ```
 
-#### Custom Configuration
-
-You can customize the library's behavior, such as changing the default prefix from `module` to something else:
-
-```nix
-# In your overlay
-(self: super: {
-  lib = super.lib // {
-    customOpts = nix-optional-modules.mkLib {
-      lib = super.lib;
-      config = {
-        prefix = "custom.prefix";
-      };
-    };
-  };
-})
-```
-
-With this configuration, instead of using `module.<path>`, you would use `custom.prefix.<path>`.
-
-Available configuration options:
-
-- `prefix` - The attribute path prefix for modules (default: `"module"`)
-
 ## Quick Start
 
 ### Module
@@ -156,12 +132,40 @@ Available configuration options:
 
 - `opts.module name opts moduleFn` - Create an optional module with enable option
 - `opts.bundle name modulePaths` - Create a bundle that enables/disables multiple modules
+- `opts.withConfig config` - Create a new instance with modified configuration
 
 ### Module Parameters
 
 - `name` - String name of the module (supports dot notation for nesting, e.g., "parent.child")
 - `opts` - Attribute set of module options with type definitions
 - `moduleFn` - Function that takes the configuration (`cfg`) and returns module settings
+
+### Custom configuration
+
+The `withConfig` function allows you to create a new library instance with different configuration options:
+
+```nix
+{
+  lib = super.lib // {
+    opts = nix-optional-modules.lib;
+    cfgOpts = nix-optional-modules.lib.withConfig { prefix = "cfg"; };
+  };
+}
+```
+
+Now you can use both `opts` (with prefix `module`) and `cfgOpts` (with prefix `cfg`) in the same configuration:
+
+```nix
+{
+  imports = [
+    (lib.opts.module "myapp" { } (cfg: { ... }))
+    (lib.cfgOpts.module "otherapp" { } (cfg: { ... }))
+  ];
+
+  module.myapp.enable = true;  # uses opts
+  cfg.otherapp.enable = true;   # uses opts2
+}
+```
 
 ### Enable Options
 

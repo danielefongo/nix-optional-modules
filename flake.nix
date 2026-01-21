@@ -17,13 +17,6 @@
         inherit (nixpkgs) lib;
         config = { };
       };
-
-      mkLib =
-        {
-          lib,
-          config ? { },
-        }:
-        import ./lib/modules.nix { inherit lib config; };
     }
     // flake-utils.lib.eachDefaultSystem (system: {
       devShells.default = nixpkgs.legacyPackages.${system}.mkShell {

@@ -415,5 +415,40 @@ in
         (t.isEq "module is enabled" context.config.my.long.prefix.path.to.mod.enable true)
       ];
     })
+
+    (tests.test "custom config" {
+      context =
+        let
+          opts1 = import ./modules.nix {
+            inherit lib;
+            config = {
+              prefix = "cfg";
+            };
+          };
+          opts2 = opts1.withConfig { prefix = "opt"; };
+        in
+
+        simulateConfig {
+          imports = [
+            (opts1.module "mod1" { } (cfg: {
+              output.mod1 = true;
+            }))
+            (opts2.module "mod2" { } (cfg: {
+              output.mod2 = true;
+            }))
+          ];
+
+          cfg.mod1.enable = true;
+          opt.mod2.enable = true;
+        };
+      checks = t: context: [
+        (t.isTrue "mod1 is enabled via cfg prefix" context.config.cfg.mod1.enable)
+        (t.isTrue "mod2 is enabled via opt prefix" context.config.opt.mod2.enable)
+        (t.isEq "both outputs are set" context.config.output {
+          mod1 = true;
+          mod2 = true;
+        })
+      ];
+    })
   ];
 }
