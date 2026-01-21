@@ -12,26 +12,22 @@
       nixpkgs,
       nix-tests,
     }:
-    flake-utils.lib.eachDefaultSystem (
-      system:
-      let
-        pkgs = nixpkgs.legacyPackages.${system};
-      in
-      {
-        devShells.default = pkgs.mkShell {
-          packages = [ nix-tests.packages.${system}.default ];
-        };
+    {
+      lib = import ./lib/modules.nix {
+        inherit (nixpkgs) lib;
+        config = { };
+      };
 
-        lib = import ./lib/modules.nix {
-          inherit (pkgs) lib;
-          config = { };
-        };
-        mkLib =
-          {
-            lib,
-            config ? { },
-          }:
-          import ./lib/modules.nix { inherit lib config; };
-      }
-    );
+      mkLib =
+        {
+          lib,
+          config ? { },
+        }:
+        import ./lib/modules.nix { inherit lib config; };
+    }
+    // flake-utils.lib.eachDefaultSystem (system: {
+      devShells.default = nixpkgs.legacyPackages.${system}.mkShell {
+        packages = [ nix-tests.packages.${system}.default ];
+      };
+    });
 }

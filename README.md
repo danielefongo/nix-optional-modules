@@ -15,29 +15,26 @@ Add the library to your flake inputs and extend your lib:
 {
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-    flake-utils.url = "github:numtide/flake-utils";
     nix-optional-modules.url = "github:danielefongo/nix-optional-modules";
   };
 
-  outputs = { nixpkgs, flake-utils, nix-optional-modules, ... }@inputs:
-    flake-utils.lib.eachDefaultSystem (system: let
-      # Create pkgs with overlays
+  outputs = { nixpkgs, nix-optional-modules, ... }:
+    let
+      system = "x86_64-linux";
       pkgs = import nixpkgs {
         inherit system;
         overlays = [
           (self: super: {
             lib = super.lib // {
-              opts = inputs.nix-optional-modules.lib.${system};
+              # Use the default library (prefix = "module")
+              opts = nix-optional-modules.lib;
             };
           })
-          # ... your other overlays
         ];
       };
     in {
-      # Export pkgs and lib for use
-      inherit pkgs;
-      lib = pkgs.lib;
-    });
+      # ...
+    };
 }
 ```
 
@@ -49,7 +46,7 @@ You can customize the library's behavior, such as changing the default prefix fr
 # In your overlay
 (self: super: {
   lib = super.lib // {
-    customOpts = inputs.nix-optional-modules.mkLib.${super.system} {
+    customOpts = nix-optional-modules.mkLib {
       lib = super.lib;
       config = {
         prefix = "custom.prefix";
