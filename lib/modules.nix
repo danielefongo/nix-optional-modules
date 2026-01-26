@@ -23,7 +23,9 @@ let
         (
           { config, lib, ... }:
           let
-            emptyConfig = { };
+            emptyConfig = {
+              enable = null;
+            };
             modulePath = pathPrefix ++ lib.splitString "." name;
 
             optionConfig = lib.mkOption {
@@ -67,45 +69,38 @@ let
                 parentEnabled = parentCfg.enable or null;
               in
               !atRoot && (parentEnabled == false || isAnyParentExplicitlyDisabled parentPath);
+
+            moduleConfig = lib.attrByPath modulePath emptyConfig config;
+
+            enabled =
+              if moduleConfig.enable == false then
+                false
+              else if isAnyParentExplicitlyDisabled modulePath then
+                false
+              else if isParentExplicitlyEnabled modulePath then
+                true
+              else
+                moduleConfig.enable == true;
+
+            output = moduleFn (if enabled then moduleConfig else emptyConfig);
+
+            prefixKey = builtins.head pathPrefix;
+            outputImports = output.imports or [ ];
+            outputModules = if output ? ${prefixKey} then { ${prefixKey} = output.${prefixKey}; } else { };
+            outputOtherAttrs = lib.removeAttrs output [
+              prefixKey
+              "imports"
+            ];
           in
           {
-            imports = (moduleFn emptyConfig).imports or [ ];
+            imports = outputImports;
             options = lib.setAttrByPath modulePath optionConfig;
-
-            config =
-              let
-                moduleCfg = lib.attrByPath modulePath emptyConfig config;
-                enableVal = moduleCfg.enable or null;
-
-                enabled =
-                  if enableVal == false then
-                    false
-                  else if isAnyParentExplicitlyDisabled modulePath then
-                    false
-                  else if isParentExplicitlyEnabled modulePath then
-                    true
-                  else
-                    enableVal == true;
-
-                params = lib.filterAttrs (k: v: k != "enable" && !(lib.isAttrs v && v ? enable)) moduleCfg;
-
-                result = moduleFn (if enabled then params else emptyConfig);
-                finalCfg = lib.removeAttrs result [ "imports" ];
-
-                moduleSettings =
-                  if finalCfg ? ${builtins.head pathPrefix} then
-                    { ${builtins.head pathPrefix} = finalCfg.${builtins.head pathPrefix}; }
-                  else
-                    { };
-
-                otherSettings = lib.removeAttrs finalCfg (lib.singleton (builtins.head pathPrefix));
-              in
-              lib.mkIf enabled (
-                lib.mkMerge [
-                  moduleSettings
-                  (otherSettings)
-                ]
-              );
+            config = lib.mkIf enabled (
+              lib.mkMerge [
+                outputModules
+                outputOtherAttrs
+              ]
+            );
           }
         )
       ];
