@@ -102,12 +102,16 @@ let
       }
     );
 
-  mkOptionalModule =
-    name: opts: moduleFn:
-    mkModule {
-      inherit name opts moduleFn;
-      pathPrefix = prefixPath;
-    };
+  mkOptionalModule = name: opts: moduleFn: {
+    imports = [
+      (mkModule {
+        pathPrefix = prefixPath;
+        name = name;
+        opts = opts;
+        moduleFn = moduleFn;
+      })
+    ];
+  };
 
   mkOptionalBundle = path: modulePaths: {
     imports = [

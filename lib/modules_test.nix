@@ -28,6 +28,14 @@ let
 in
 {
   result = tests.runTests [
+    (tests.test "raw module is valid" {
+      context = opts.module "mod" { } (cfg: { });
+      checks = t: context: [
+        (t.isTrue "it is a set" (lib.isAttrs context))
+        (t.hasAttr "has module option" "imports" context)
+      ];
+    })
+
     (tests.test "module creates a config" {
       context = simulateConfig {
         imports = [
@@ -46,7 +54,7 @@ in
       };
       checks = t: context: [
         (t.hasAttr "has module option" "mod" context.options.module)
-        (t.isEq "default value is 42" context.config.module.mod {
+        (t.isEq "config is set" context.config.module.mod {
           enable = null;
           value = 42;
           value2 = "custom value";
@@ -67,7 +75,7 @@ in
       };
       checks = t: context: [
         (t.hasAttr "has module option" "child" context.options.module.parent)
-        (t.isEq "default value is 42" context.config.module.parent.child {
+        (t.isEq "config is set" context.config.module.parent.child {
           enable = null;
           value = 42;
         })
@@ -234,6 +242,14 @@ in
           parent = "from parent";
           child = "from child";
         })
+      ];
+    })
+
+    (tests.test "raw bundle is valid" {
+      context = opts.bundle "bundle" [ "mod" ];
+      checks = t: context: [
+        (t.isTrue "it is a set" (lib.isAttrs context))
+        (t.hasAttr "has module option" "imports" context)
       ];
     })
 
