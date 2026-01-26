@@ -170,66 +170,6 @@ in
       ];
     })
 
-    (tests.test "parent module can disable child module" {
-      context = simulateConfig {
-        imports = [
-          (opts.module "mod"
-            {
-              disable_child = {
-                type = lib.types.bool;
-                default = false;
-              };
-            }
-            (cfg: {
-              module.mod.child.enable = !cfg.disable_child;
-            })
-          )
-          (opts.module "mod.child" { } (cfg: {
-            output.xxx = true;
-          }))
-        ];
-
-        module.mod = {
-          enable = true;
-          disable_child = true;
-        };
-      };
-      checks = t: context: [
-        (t.isEq "output is not set" context.config.output { })
-      ];
-    })
-
-    (tests.test "parent module can force disable child with mkForce" {
-      context = simulateConfig {
-        imports = [
-          (opts.module "parent"
-            {
-              disable_child = {
-                type = lib.types.bool;
-                default = false;
-              };
-            }
-            (cfg: {
-              module.parent.child.enable = lib.mkForce (!cfg.disable_child);
-            })
-          )
-          (opts.module "parent.child" { } (cfg: {
-            output.child = true;
-          }))
-        ];
-
-        module.parent = {
-          enable = true;
-          disable_child = true;
-        };
-        module.parent.child.enable = true;
-      };
-      checks = t: context: [
-        (t.isEq "child is force disabled" context.config.module.parent.child.enable false)
-        (t.isEq "output is not set" context.config.output { })
-      ];
-    })
-
     (tests.test "module enables another module" {
       context = simulateConfig {
         imports = [
@@ -251,6 +191,24 @@ in
           mod1 = true;
           mod2 = true;
         })
+      ];
+    })
+
+    (tests.test "disabled module does not enable another module" {
+      context = simulateConfig {
+        imports = [
+          (opts.module "mod1" { } (cfg: {
+            module.mod2.enable = true;
+            output.mod1 = true;
+          }))
+          (opts.module "mod2" { } (cfg: {
+            output.mod2 = true;
+          }))
+        ];
+      };
+      checks = t: context: [
+        (t.isNull "mod1 enable is null" context.config.module.mod1.enable)
+        (t.isEq "output is not set" context.config.output { })
       ];
     })
 

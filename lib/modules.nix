@@ -93,10 +93,10 @@ let
       {
         imports = outputImports;
         options = lib.setAttrByPath modulePath optionConfig;
-        config = (
+        config = lib.mkIf enabled (
           lib.mkMerge [
             outputModules
-            (lib.mkIf enabled outputOtherAttrs)
+            outputOtherAttrs
           ]
         );
       }
