@@ -18,100 +18,105 @@ let
       opts,
       moduleFn,
     }:
-    (
-      { config, lib, ... }:
-      let
-        emptyConfig = {
-          enable = null;
-        };
-        modulePath = pathPrefix ++ lib.splitString "." name;
+    {
+      imports = [
+        (
+          { config, lib, ... }:
+          let
+            emptyConfig = { };
+            modulePath = pathPrefix ++ lib.splitString "." name;
 
-        optionConfig = lib.mkOption {
-          default = emptyConfig;
-          type = lib.types.submodule {
-            options = {
-              enable = lib.mkOption {
-                type = lib.types.nullOr lib.types.bool;
-                default = null;
-                description = "Whether to enable ${name}. Null means inherit from parent.";
+            optionConfig = lib.mkOption {
+              default = emptyConfig;
+              type = lib.types.submodule {
+                options = {
+                  enable = lib.mkOption {
+                    type = lib.types.nullOr lib.types.bool;
+                    default = null;
+                    description = "Whether to enable ${name}. Null means inherit from parent.";
+                  };
+                }
+                // (lib.mapAttrs (
+                  _: paramDef:
+                  lib.mkOption {
+                    type = paramDef.type;
+                    description = paramDef.description or "";
+                  }
+                  // lib.optionalAttrs (paramDef ? default) { default = paramDef.default; }
+                ) opts);
               };
-            }
-            // (lib.mapAttrs (
-              _: paramDef:
-              lib.mkOption {
-                type = paramDef.type;
-                description = paramDef.description or "";
-              }
-              // lib.optionalAttrs (paramDef ? default) { default = paramDef.default; }
-            ) opts);
-          };
-        };
+            };
 
-        isParentExplicitlyEnabled =
-          path:
-          let
-            atRoot = lib.length path <= lib.length pathPrefix;
-            parentPath = lib.init path;
-            parentCfg = lib.attrByPath parentPath null config;
-            parentEnabled = parentCfg.enable or null;
+            isParentExplicitlyEnabled =
+              path:
+              let
+                atRoot = lib.length path <= lib.length pathPrefix;
+                parentPath = lib.init path;
+                parentCfg = lib.attrByPath parentPath null config;
+                parentEnabled = parentCfg.enable or null;
+              in
+              !atRoot
+              && (parentEnabled == true || (parentEnabled != false && isParentExplicitlyEnabled parentPath));
+
+            isAnyParentExplicitlyDisabled =
+              path:
+              let
+                atRoot = lib.length path <= lib.length pathPrefix;
+                parentPath = lib.init path;
+                parentCfg = lib.attrByPath parentPath null config;
+                parentEnabled = parentCfg.enable or null;
+              in
+              !atRoot && (parentEnabled == false || isAnyParentExplicitlyDisabled parentPath);
           in
-          !atRoot
-          && (parentEnabled == true || (parentEnabled != false && isParentExplicitlyEnabled parentPath));
+          {
+            imports = (moduleFn emptyConfig).imports or [ ];
+            options = lib.setAttrByPath modulePath optionConfig;
 
-        isAnyParentExplicitlyDisabled =
-          path:
-          let
-            atRoot = lib.length path <= lib.length pathPrefix;
-            parentPath = lib.init path;
-            parentCfg = lib.attrByPath parentPath null config;
-            parentEnabled = parentCfg.enable or null;
-          in
-          !atRoot && (parentEnabled == false || isAnyParentExplicitlyDisabled parentPath);
+            config =
+              let
+                moduleCfg = lib.attrByPath modulePath emptyConfig config;
+                enableVal = moduleCfg.enable or null;
 
-        moduleConfig = lib.attrByPath modulePath emptyConfig config;
+                enabled =
+                  if enableVal == false then
+                    false
+                  else if isAnyParentExplicitlyDisabled modulePath then
+                    false
+                  else if isParentExplicitlyEnabled modulePath then
+                    true
+                  else
+                    enableVal == true;
 
-        enabled =
-          if moduleConfig.enable == false then
-            false
-          else if isAnyParentExplicitlyDisabled modulePath then
-            false
-          else if isParentExplicitlyEnabled modulePath then
-            true
-          else
-            moduleConfig.enable == true;
+                params = lib.filterAttrs (k: v: k != "enable" && !(lib.isAttrs v && v ? enable)) moduleCfg;
 
-        output = moduleFn (if enabled then moduleConfig else emptyConfig);
+                result = moduleFn (if enabled then params else emptyConfig);
+                finalCfg = lib.removeAttrs result [ "imports" ];
 
-        prefixKey = builtins.head pathPrefix;
-        outputImports = output.imports or [ ];
-        outputModules = if output ? ${prefixKey} then { ${prefixKey} = output.${prefixKey}; } else { };
-        outputOtherAttrs = lib.removeAttrs output [
-          prefixKey
-          "imports"
-        ];
-      in
-      {
-        imports = outputImports;
-        options = lib.setAttrByPath modulePath optionConfig;
-        config = lib.mkIf enabled (
-          lib.mkMerge [
-            outputModules
-            outputOtherAttrs
-          ]
-        );
-      }
-    );
+                moduleSettings =
+                  if finalCfg ? ${builtins.head pathPrefix} then
+                    { ${builtins.head pathPrefix} = finalCfg.${builtins.head pathPrefix}; }
+                  else
+                    { };
 
-  mkOptionalModule = name: opts: moduleFn: {
-    imports = [
-      (mkModule {
-        pathPrefix = prefixPath;
-        name = name;
-        opts = opts;
-        moduleFn = moduleFn;
-      })
-    ];
-  };
+                otherSettings = lib.removeAttrs finalCfg (lib.singleton (builtins.head pathPrefix));
+              in
+              lib.mkIf enabled (
+                lib.mkMerge [
+                  moduleSettings
+                  (otherSettings)
+                ]
+              );
+          }
+        )
+      ];
+    };
+
+  mkOptionalModule =
+    name: opts: moduleFn:
+    mkModule {
+      inherit name opts moduleFn;
+      pathPrefix = prefixPath;
+    };
 
   mkOptionalBundle = path: modulePaths: {
     imports = [
