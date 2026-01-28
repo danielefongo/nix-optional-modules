@@ -28,6 +28,14 @@ let
 in
 {
   result = tests.runTests [
+    (tests.test "raw module is valid" {
+      context = opts.module "mod" { } (cfg: { });
+      checks = t: context: [
+        (t.isTrue "it is a set" (lib.isAttrs context))
+        (t.hasAttr "has imports" "imports" context)
+      ];
+    })
+
     (tests.test "module creates a config" {
       context = simulateConfig {
         imports = [
@@ -46,7 +54,7 @@ in
       };
       checks = t: context: [
         (t.hasAttr "has module option" "mod" context.options.module)
-        (t.isEq "default value is 42" context.config.module.mod {
+        (t.isEq "config is set" context.config.module.mod {
           enable = null;
           value = 42;
           value2 = "custom value";
@@ -66,8 +74,9 @@ in
         ];
       };
       checks = t: context: [
-        (t.hasAttr "has module option" "child" context.options.module.parent)
-        (t.isEq "default value is 42" context.config.module.parent.child {
+        (t.hasAttr "has parent option" "parent" context.options.module)
+        (t.hasAttr "has child option" "child" context.options.module.parent)
+        (t.isEq "config is set" context.config.module.parent.child {
           enable = null;
           value = 42;
         })
@@ -147,6 +156,7 @@ in
         module.parent.enable = true;
       };
       checks = t: context: [
+        (t.isTrue "child inherits enable from parent" context.config.module.parent.child.enable)
         (t.isEq "output is set" context.config.output {
           val = 42;
         })
@@ -166,6 +176,7 @@ in
         module.parent.child.enable = true;
       };
       checks = t: context: [
+        (t.isEq "child is disabled by parent" context.config.module.parent.child.enable false)
         (t.isEq "output is not set" context.config.output { })
       ];
     })
@@ -181,7 +192,7 @@ in
               };
             }
             (cfg: {
-              module.mod.child.enable = !cfg.disable_child;
+              module.mod.child.enable = lib.mkForce (!cfg.disable_child);
             })
           )
           (opts.module "mod.child" { } (cfg: {
@@ -230,6 +241,25 @@ in
       ];
     })
 
+    (tests.test "child module can be forced enabled with mkForce" {
+      context = simulateConfig {
+        imports = [
+          (opts.module "parent" { } (cfg: { }))
+          (opts.module "parent.child" { } (cfg: {
+            output.child = true;
+          }))
+        ];
+
+        module.parent.enable = false;
+        module.parent.child.enable = lib.mkForce true;
+      };
+      checks = t: context: [
+        (t.isEq "parent is disabled" context.config.module.parent.enable false)
+        (t.isEq "child is enabled with mkForce" context.config.module.parent.child.enable true)
+        (t.isEq "output is set" context.config.output { child = true; })
+      ];
+    })
+
     (tests.test "module enables another module" {
       context = simulateConfig {
         imports = [
@@ -254,6 +284,49 @@ in
       ];
     })
 
+    (tests.test "disabled module does not enable another module" {
+      context = simulateConfig {
+        imports = [
+          (opts.module "mod1" { } (cfg: {
+            module.mod2.enable = true;
+            output.mod1 = true;
+          }))
+          (opts.module "mod2" { } (cfg: {
+            output.mod2 = true;
+          }))
+        ];
+      };
+      checks = t: context: [
+        (t.isNull "mod1 enable is null" context.config.module.mod1.enable)
+        (t.isEq "output is not set" context.config.output { })
+      ];
+    })
+
+    (tests.test "nested module enables another module" {
+      context = simulateConfig {
+        imports = [
+          (opts.module "mod" { } (cfg: { }))
+          (opts.module "mod.child1" { } (cfg: {
+            module.mod.child2.enable = true;
+            output.child1 = true;
+          }))
+          (opts.module "mod.child2" { } (cfg: {
+            output.child2 = true;
+          }))
+        ];
+
+        module.mod.child1.enable = true;
+      };
+      checks = t: context: [
+        (t.isTrue "child1 is enabled" context.config.module.mod.child1.enable)
+        (t.isTrue "child2 is enabled by child1" context.config.module.mod.child2.enable)
+        (t.isEq "both outputs are set" context.config.output {
+          child1 = true;
+          child2 = true;
+        })
+      ];
+    })
+
     (tests.test "module with nested imports" {
       context = simulateConfig {
         imports = [
@@ -271,11 +344,19 @@ in
       };
       checks = t: context: [
         (t.isEq "parent is enabled" context.config.module.parent.enable true)
-        (t.isNull "child inherits null enable" context.config.module.parent.child.enable)
+        (t.isTrue "child inherits enable from parent" context.config.module.parent.child.enable)
         (t.isEq "both outputs are set" context.config.output {
           parent = "from parent";
           child = "from child";
         })
+      ];
+    })
+
+    (tests.test "raw bundle is valid" {
+      context = opts.bundle "bundle" [ "mod" ];
+      checks = t: context: [
+        (t.isTrue "it is a set" (lib.isAttrs context))
+        (t.hasAttr "has module option" "imports" context)
       ];
     })
 
@@ -340,6 +421,35 @@ in
       ];
     })
 
+    (tests.test "bundle with parent" {
+      context = simulateConfig {
+        imports = [
+          (opts.module "parent" { } (cfg: { }))
+          (opts.bundle "parent.bundle" [
+            "parent.mod1"
+            "parent.mod2"
+          ])
+          (opts.module "parent.mod1" { } (cfg: {
+            output.mod1 = true;
+          }))
+          (opts.module "parent.mod2" { } (cfg: {
+            output.mod2 = true;
+          }))
+        ];
+
+        module.parent.enable = true;
+        module.parent.bundle.enable = true;
+      };
+      checks = t: context: [
+        (t.isEq "parent is enabled" context.config.module.parent.enable true)
+        (t.isEq "bundle is enabled" context.config.module.parent.bundle.enable true)
+        (t.isEq "outputs are set" context.config.output {
+          mod1 = true;
+          mod2 = true;
+        })
+      ];
+    })
+
     (tests.test "parent disabled overrides bundle enabled" {
       context = simulateConfig {
         imports = [
@@ -361,7 +471,7 @@ in
       };
       checks = t: context: [
         (t.isEq "parent is disabled" context.config.module.parent.enable false)
-        (t.isEq "bundle is enabled" context.config.module.parent.bundle.enable true)
+        (t.isEq "bundle is disabled by parent" context.config.module.parent.bundle.enable false)
         (t.isEq "no output is set" context.config.output { })
       ];
     })
