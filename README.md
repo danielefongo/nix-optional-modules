@@ -1,4 +1,4 @@
-# optional-modules.nix
+# nix-optional-modules
 
 ![Nix](https://img.shields.io/badge/Nix-5277C3?style=flat-square&logo=nix&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)
