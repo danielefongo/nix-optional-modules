@@ -54,12 +54,12 @@ Add the library to your flake inputs and extend your lib:
           description = "Port for my service";
         };
       }
-      (cfg: {
+      ({ moduleConfig, ... }: {
         systemd.services.myservice = {
           description = "My custom service";
           wantedBy = [ "multi-user.target" ];
           serviceConfig = {
-            ExecStart = "${pkgs.myPackage}/bin/my-service --port ${toString cfg.port}";
+            ExecStart = "${pkgs.myPackage}/bin/my-service --port ${toString moduleConfig.port}";
           };
         };
       })
@@ -84,15 +84,15 @@ Add the library to your flake inputs and extend your lib:
         type = lib.types.int;
         default = 42;
       };
-    } (cfg: { }))
+    } (_: { }))
 
     # Child module
     (lib.opts.module "parent.child" {
       name = {
         type = lib.types.str;
       };
-    } (cfg: {
-      output.result = "child-${cfg.name}";
+    } ({ moduleConfig, ... }: {
+      output.result = "child-${moduleConfig.name}";
     }))
   ];
   
@@ -114,11 +114,11 @@ Add the library to your flake inputs and extend your lib:
       "app.immich"
     ])
     
-    (lib.opts.module "app.nextcloud" { } (cfg: {
+    (lib.opts.module "app.nextcloud" { } (_: {
       home.packages = [ pkgs.nextcloud ];
     }))
     
-    (lib.opts.module "app.immich" { } (cfg: {
+    (lib.opts.module "app.immich" { } (_: {
       home.packages = [ pkgs.immich ];
     }))
   ];
@@ -138,7 +138,8 @@ Add the library to your flake inputs and extend your lib:
 
 - `name` - String name of the module (supports dot notation for nesting, e.g., "parent.child")
 - `opts` - Attribute set of module options with type definitions
-- `moduleFn` - Function that takes the configuration (`cfg`) and returns module settings
+- `moduleFn` - Function that receives full module arguments (e.g., `{ config, lib, pkgs, moduleConfig, ... }`) and returns module settings
+  - `moduleConfig` - This module's configuration (the `opts` you defined)
 
 ### Custom configuration
 
@@ -158,12 +159,12 @@ Now you can use both `opts` (with prefix `module`) and `cfgOpts` (with prefix `c
 ```nix
 {
   imports = [
-    (lib.opts.module "myapp" { } (cfg: { ... }))
-    (lib.cfgOpts.module "otherapp" { } (cfg: { ... }))
+    (lib.opts.module "myapp" { } (_: { ... }))
+    (lib.cfgOpts.module "otherapp" { } (_: { ... }))
   ];
 
   module.myapp.enable = true;  # uses opts
-  cfg.otherapp.enable = true;   # uses opts2
+  cfg.otherapp.enable = true;   # uses cfgOpts
 }
 ```
 
