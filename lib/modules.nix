@@ -39,7 +39,7 @@ let
     {
       imports = [
         (
-          { config, lib, ... }:
+          moduleArgs@{ config, lib, ... }:
           let
             prefixKey = builtins.head modulePath;
             emptyConfig = { };
@@ -69,7 +69,12 @@ let
             moduleConfig = lib.attrByPath modulePath emptyConfig config;
             moduleEnabled = moduleConfig.enable == true;
 
-            output = moduleFn (if moduleEnabled then moduleConfig else emptyConfig);
+            output = moduleFn (
+              moduleArgs
+              // {
+                moduleConfig = if moduleEnabled then moduleConfig else emptyConfig;
+              }
+            );
             outputOptions = lib.setAttrByPath modulePath moduleOptions;
             outputImports = output.imports or [ ];
             outputModules =
@@ -114,7 +119,7 @@ let
 
   mkOptionalBundle = path: modulePaths: {
     imports = [
-      (mkOptionalModule path { } (cfg: { }))
+      (mkOptionalModule path { } (_: { }))
       (
         { config, lib, ... }:
         {

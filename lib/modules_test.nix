@@ -28,7 +28,7 @@ let
 in
 tests.runTests {
   "raw module is valid" = t: rec {
-    cfg = opts.module "mod" { } (cfg: { });
+    cfg = opts.module "mod" { } (_: { });
 
     "it is a set" = t.isTrue (lib.isAttrs cfg);
     "has imports" = t.hasAttr "imports" cfg;
@@ -45,7 +45,7 @@ tests.runTests {
           value2 = {
             type = lib.types.str;
           };
-        } (cfg: { }))
+        } (_: { }))
       ];
 
       module.mod.value2 = "custom value";
@@ -67,7 +67,7 @@ tests.runTests {
             type = lib.types.int;
             default = 42;
           };
-        } (cfg: { }))
+        } (_: { }))
       ];
     };
 
@@ -92,9 +92,12 @@ tests.runTests {
               type = lib.types.str;
             };
           }
-          (cfg: {
-            output.value = "${cfg.name}-${toString cfg.count}";
-          })
+          (
+            { moduleConfig, ... }:
+            {
+              output.value = "${moduleConfig.name}-${toString moduleConfig.count}";
+            }
+          )
         )
       ];
 
@@ -113,7 +116,7 @@ tests.runTests {
   "disabled module does not set output" = t: rec {
     cfg = simulateConfig {
       imports = [
-        (opts.module "mod" { } (cfg: {
+        (opts.module "mod" { } (_: {
           output.shouldNotExist = "This should not be set if module is disabled";
         }))
       ];
@@ -127,7 +130,7 @@ tests.runTests {
   "disabled module by default" = t: rec {
     cfg = simulateConfig {
       imports = [
-        (opts.module "mod" { } (cfg: {
+        (opts.module "mod" { } (_: {
           output.shouldNotExist = "This should not be set if module is disabled";
         }))
       ];
@@ -140,8 +143,8 @@ tests.runTests {
   "nested module enabled by parent" = t: rec {
     cfg = simulateConfig {
       imports = [
-        (opts.module "parent" { } (cfg: { }))
-        (opts.module "parent.child" { } (cfg: {
+        (opts.module "parent" { } (_: { }))
+        (opts.module "parent.child" { } (_: {
           output.val = 42;
         }))
       ];
@@ -158,8 +161,8 @@ tests.runTests {
   "nested module disabled by parent" = t: rec {
     cfg = simulateConfig {
       imports = [
-        (opts.module "parent" { } (cfg: { }))
-        (opts.module "parent.child" { } (cfg: {
+        (opts.module "parent" { } (_: { }))
+        (opts.module "parent.child" { } (_: {
           output.shouldNotExist = "This should not be set if parent is disabled";
         }))
       ];
@@ -182,11 +185,14 @@ tests.runTests {
               default = false;
             };
           }
-          (cfg: {
-            module.mod.child.enable = lib.mkForce (!cfg.disable_child);
-          })
+          (
+            { moduleConfig, ... }:
+            {
+              module.mod.child.enable = lib.mkForce (!moduleConfig.disable_child);
+            }
+          )
         )
-        (opts.module "mod.child" { } (cfg: {
+        (opts.module "mod.child" { } (_: {
           output.xxx = true;
         }))
       ];
@@ -210,11 +216,14 @@ tests.runTests {
               default = false;
             };
           }
-          (cfg: {
-            module.parent.child.enable = lib.mkForce (!cfg.disable_child);
-          })
+          (
+            { moduleConfig, ... }:
+            {
+              module.parent.child.enable = lib.mkForce (!moduleConfig.disable_child);
+            }
+          )
         )
-        (opts.module "parent.child" { } (cfg: {
+        (opts.module "parent.child" { } (_: {
           output.child = true;
         }))
       ];
@@ -233,8 +242,8 @@ tests.runTests {
   "child module can be forced enabled with mkForce" = t: rec {
     cfg = simulateConfig {
       imports = [
-        (opts.module "parent" { } (cfg: { }))
-        (opts.module "parent.child" { } (cfg: {
+        (opts.module "parent" { } (_: { }))
+        (opts.module "parent.child" { } (_: {
           output.child = true;
         }))
       ];
@@ -251,11 +260,11 @@ tests.runTests {
   "module enables another module" = t: rec {
     cfg = simulateConfig {
       imports = [
-        (opts.module "mod1" { } (cfg: {
+        (opts.module "mod1" { } (_: {
           module.mod2.enable = true;
           output.mod1 = true;
         }))
-        (opts.module "mod2" { } (cfg: {
+        (opts.module "mod2" { } (_: {
           output.mod2 = true;
         }))
       ];
@@ -274,11 +283,11 @@ tests.runTests {
   "disabled module does not enable another module" = t: rec {
     cfg = simulateConfig {
       imports = [
-        (opts.module "mod1" { } (cfg: {
+        (opts.module "mod1" { } (_: {
           module.mod2.enable = true;
           output.mod1 = true;
         }))
-        (opts.module "mod2" { } (cfg: {
+        (opts.module "mod2" { } (_: {
           output.mod2 = true;
         }))
       ];
@@ -291,12 +300,12 @@ tests.runTests {
   "nested module enables another module" = t: rec {
     cfg = simulateConfig {
       imports = [
-        (opts.module "mod" { } (cfg: { }))
-        (opts.module "mod.child1" { } (cfg: {
+        (opts.module "mod" { } (_: { }))
+        (opts.module "mod.child1" { } (_: {
           module.mod.child2.enable = true;
           output.child1 = true;
         }))
-        (opts.module "mod.child2" { } (cfg: {
+        (opts.module "mod.child2" { } (_: {
           output.child2 = true;
         }))
       ];
@@ -315,9 +324,9 @@ tests.runTests {
   "module with nested imports" = t: rec {
     cfg = simulateConfig {
       imports = [
-        (opts.module "parent" { } (cfg: {
+        (opts.module "parent" { } (_: {
           imports = [
-            (opts.module "parent.child" { } (cfg: {
+            (opts.module "parent.child" { } (_: {
               output.child = "from child";
             }))
           ];
@@ -351,13 +360,13 @@ tests.runTests {
           "mod2"
           "mod3"
         ])
-        (opts.module "mod1" { } (cfg: {
+        (opts.module "mod1" { } (_: {
           output.mod1 = true;
         }))
-        (opts.module "mod2" { } (cfg: {
+        (opts.module "mod2" { } (_: {
           output.mod2 = true;
         }))
-        (opts.module "mod3" { } (cfg: {
+        (opts.module "mod3" { } (_: {
           output.mod3 = true;
         }))
       ];
@@ -383,10 +392,10 @@ tests.runTests {
           "mod1"
           "mod2"
         ])
-        (opts.module "mod1" { } (cfg: {
+        (opts.module "mod1" { } (_: {
           output.mod1 = true;
         }))
-        (opts.module "mod2" { } (cfg: {
+        (opts.module "mod2" { } (_: {
           output.mod2 = true;
         }))
       ];
@@ -405,15 +414,15 @@ tests.runTests {
   "bundle with parent" = t: rec {
     cfg = simulateConfig {
       imports = [
-        (opts.module "parent" { } (cfg: { }))
+        (opts.module "parent" { } (_: { }))
         (opts.bundle "parent.bundle" [
           "parent.mod1"
           "parent.mod2"
         ])
-        (opts.module "parent.mod1" { } (cfg: {
+        (opts.module "parent.mod1" { } (_: {
           output.mod1 = true;
         }))
-        (opts.module "parent.mod2" { } (cfg: {
+        (opts.module "parent.mod2" { } (_: {
           output.mod2 = true;
         }))
       ];
@@ -433,15 +442,15 @@ tests.runTests {
   "parent disabled overrides bundle enabled" = t: rec {
     cfg = simulateConfig {
       imports = [
-        (opts.module "parent" { } (cfg: { }))
+        (opts.module "parent" { } (_: { }))
         (opts.bundle "parent.bundle" [
           "parent.mod1"
           "parent.mod2"
         ])
-        (opts.module "parent.mod1" { } (cfg: {
+        (opts.module "parent.mod1" { } (_: {
           output.mod1 = true;
         }))
-        (opts.module "parent.mod2" { } (cfg: {
+        (opts.module "parent.mod2" { } (_: {
           output.mod2 = true;
         }))
       ];
@@ -467,7 +476,7 @@ tests.runTests {
       imports = [
         (optsCustom.module "path.to.mod" {
           value = { };
-        } (cfg: { }))
+        } (_: { }))
       ];
 
       prefix.path.to.mod.enable = true;
@@ -486,7 +495,7 @@ tests.runTests {
 
     cfg = simulateConfig {
       imports = [
-        (optsCustom.module "path.to.mod" { } (cfg: {
+        (optsCustom.module "path.to.mod" { } (_: {
           output.result = true;
         }))
       ];
@@ -525,6 +534,41 @@ tests.runTests {
     "both outputs are set" = t.isEq cfg.config.output {
       mod1 = true;
       mod2 = true;
+    };
+  };
+
+  "module can access global configuration" = t: rec {
+    cfg = simulateConfig {
+      imports = [
+        (opts.module "modA" { } (_: {
+          output.modA = "outputA";
+        }))
+        (opts.module "modB" { } (
+          {
+            config,
+            ...
+          }:
+          {
+            module.modC.enable = config.module.modA.enable or false;
+            output.modB = "outputB";
+          }
+        ))
+        (opts.module "modC" { } (_: {
+          output.modC = "outputC";
+        }))
+      ];
+
+      module.modA.enable = true;
+      module.modB.enable = true;
+    };
+
+    "modA is enabled" = t.isTrue cfg.config.module.modA.enable;
+    "modB is enabled" = t.isTrue cfg.config.module.modB.enable;
+    "modC is enabled by modB" = t.isTrue cfg.config.module.modC.enable;
+    "all outputs are set" = t.isEq cfg.config.output {
+      modA = "outputA";
+      modB = "outputB";
+      modC = "outputC";
     };
   };
 }
