@@ -411,6 +411,40 @@ tests.runTests {
     "no output is set" = t.isEq cfg.config.output { };
   };
 
+  "multiple bundles sharing modules" = t: rec {
+    cfg = simulateConfig {
+      imports = [
+        (opts.bundle "bundle1" [
+          "mod1"
+          "mod2"
+        ])
+        (opts.bundle "bundle2" [
+          "mod2"
+        ])
+        (opts.bundle "bundle3" [
+          "mod1"
+        ])
+        (opts.module "mod1" { } (_: {
+          output.mod1 = true;
+        }))
+        (opts.module "mod2" { } (_: {
+          output.mod2 = true;
+        }))
+      ];
+
+      module.bundle1.enable = true;
+      module.bundle2.enable = true;
+      module.bundle3.enable = false;
+    };
+
+    "bundle1 is enabled" = t.isEq cfg.config.module.bundle1.enable true;
+    "mod1 is disabled" = t.isEq cfg.config.module.mod1.enable false;
+    "mod2 is enabled" = t.isEq cfg.config.module.mod2.enable true;
+    "outputs is set" = t.isEq cfg.config.output {
+      mod2 = true;
+    };
+  };
+
   "bundle with parent" = t: rec {
     cfg = simulateConfig {
       imports = [

@@ -133,15 +133,18 @@ let
                 bundleCfg = lib.attrByPath bundlePath { } config;
                 bundleEnabled = bundleCfg.enable or null;
               in
-              lib.setAttrByPath fullModulePath {
-                enable =
-                  if bundleEnabled == true then
-                    lib.mkDefault true
-                  else if bundleEnabled == false then
-                    lib.mkOverride 75 false
-                  else
-                    lib.mkDefault null;
-              }
+              lib.mkMerge [
+                (lib.mkIf (bundleEnabled == true) (
+                  lib.setAttrByPath fullModulePath {
+                    enable = lib.mkDefault true;
+                  }
+                ))
+                (lib.mkIf (bundleEnabled == false) (
+                  lib.setAttrByPath fullModulePath {
+                    enable = lib.mkOverride 75 false;
+                  }
+                ))
+              ]
             ) modulePaths
           );
         }
